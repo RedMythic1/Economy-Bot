@@ -1,6 +1,5 @@
--banking system\
 -stocks system\
 -investment and multithreading\
 -smoother finish\
 -make discord bot repy to commands with @ function\
--fix bank system
+-item transfer system
