@@ -1,4 +1,5 @@
 import discord
+import threading
 from discord.ext import commands
 import os
 from replit import db
@@ -24,12 +25,11 @@ async def start(ctx):
 async def commands(ctx):
 	embed = discord.Embed(title = '**COMMANDS LIST**', description= "Here is the complete list of Stonkbroker's current commands.\n**.start**\n```bash\nStarts a new profile in Stonkbroker.```\n **.commands**\n ```bash\n Opens up a list of all the commands in the game bot.```\n **.invest**\n```bash\nShows the list of possible investments to invest in.```", color=0xAA28FF)
 	await ctx.send(embed = embed)
-
-@bot.command()
+@bot.command() 
 async def invest(ctx):
 	aapl = yf.Ticker("AAPL")
 	msft = yf.Ticker("MSFT")
 	nvda = yf.Ticker("NVDA")
 	embed = discord.Embed(title="**INVESTMENT LIST**", description=f"Here is the list of all possible investments.\n **AAPL (Apple) - {aapl.info['regularMarketPrice']} USD**\n **MSFT(Microsoft) - {msft.info['regularMarketPrice']} USD**\n **NVDA(Nvidia Corporation)-{nvda.info['regularMarketPrice']} USD**", color=0xAA28FF)
-	await ctx.send(embed = embed)
+	await ctx.send(embed = embed)											 
 bot.run(TOKEN)
