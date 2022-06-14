@@ -96,15 +96,18 @@ async def payshop(ctx, arg1, arg2):
 		shooplen = len(shoop)
 		intarg2 = int(arg2)
 		paydue = intarg2/shooplen
-		while shooplen>0:
+		while shooplen>=0:
 			shooplen-=1
 			payto = shoop[shooplen]
 			cashmoney = db[f'{payto}_money']
 			cashmoney+=paydue
+			print(cashmoney)
 			db[f'{payto}_money'] = cashmoney
-			if shooplen==1:
+		if shooplen<1:
 				cashboi = db[f'{ctx.author}_money']
 				cashboi -= intarg2
+				print(cashboi)
+				print(intarg2)
 				db[f'{ctx.author}_money'] = cashboi
 				embed = discord.Embed(
 					title='**PAID**',
