@@ -1,4 +1,3 @@
--stocks system\
--investment and multithreading\
+
 -item transfer system
 -create a user interaction with jobs

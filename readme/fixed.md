@@ -4,4 +4,4 @@
 .bank\
 .deposit\
 .withdraw\
-.pay
+.pay\
