@@ -3,15 +3,19 @@ from discord.ext import commands
 import os
 from replit import db
 import finnhub
+import asyncio
 APIKEY = os.environ['API_KEY']
 finnhub_client = finnhub.Client(api_key=APIKEY)
 
 TOKEN = os.environ['DISCORD_TOKEN']
 keys = db.keys()
 
-bot = commands.Bot(command_prefix='.')
+bot = commands.Bot(command_prefix='.', activity=discord.Activity(type=discord.ActivityType.watching, name='.start'))
 
-activity = discord.Activity(type=discord.ActivityType.watching,name=".start")
+@bot.event
+async def on_ready():
+	print('logged in')
+
 
 #starts a user's profile and/or restarts a user's profile-$0 USD.
 @bot.command()
@@ -21,7 +25,7 @@ async def start(ctx):
         description=
         'Welcome to Stonkbroker, the Discord game bot based off of the real life **stock market**. Experience ups :chart_with_upwards_trend:, downs :chart_with_downwards_trend:, and everything in between.',
 				color=0xAA28FF)
-		if ctx.author not in keys:
+		if f'{ctx.author}_money' not in keys:
 				db[f'{ctx.author}_money'] = 0
 				db[f'{ctx.author}_bank'] = 0
 		print("hi")
@@ -46,36 +50,32 @@ async def commands(ctx):
 #allows the user to claim their daily cash amount
 @bot.command()
 async def daily(ctx):
-    money = db[f'{ctx.author}_money']
-    money += 100
-    db[f'{ctx.author}_money'] = money
-    db[f'{ctx.author}_daily'] = 'claimed'
-    await ctx.reply("Daily for today has been claimed")
-
-
-
-
+		money = db[f'{ctx.author.id}_money']
+		money += 100
+		db[f'{ctx.author}_money'] = money
+		db[f'{ctx.author}_daily'] = 'claimed'
+		await ctx.reply("Daily for today has been claimed")
 #allows the user to send another user a certain amount of cash.
 @bot.command()
-async def pay(ctx, arg1, arg2):
+async def pay(ctx, member: discord.Member, arg2):
 		cash_app = int(arg2)
 		if cash_app>0:
-			cash_sent = db[f'{arg1}_money']
+			cash_sent = db[f'{member.id}_money']
 			new_cash = cash_sent + cash_app
 			print(cash_sent)
 			print(cash_app)
-			db[f'{arg1}_money'] = new_cash
+			db[f'{member.id}_money'] = new_cash
 			money_deductable = db[f'{ctx.author}_money']
 			new_money = money_deductable - cash_app
 			if money_deductable < 0:
 					cash_sent -= cash_app
-					db[f'{arg1}_money'] = cash_sent
+					db[f'{member.id}_money'] = cash_sent
 					await ctx.reply('Insufficeint Funds**!!!**')
 					db[f'{ctx.author}_money'] = (money_deductable + cash_app)
-			db[f'{ctx.author}_money'] = new_money
+			db[f'{ctx.author.id}_money'] = new_money
 			embed = discord.Embed(
 					title="***MONEY SENT***",
-					description=f"**You, {ctx.author}, sent {cash_app} USD to {arg1}!**",
+					description=f"**You, {ctx.author}, sent {cash_app} USD to {member.mention}!**",
 					color=0xAA28FF)
 			await ctx.reply(embed=embed)
 		if cash_app<=0:
@@ -128,13 +128,24 @@ async def payshop(ctx, arg1, arg2):
 						cashboi -= intarg2
 						print(cashboi)
 						print(intarg2)
-						db[f'{ctx.author}_money'] = cashboi
-						embed = discord.Embed(
-                title='**PAID**',
-                description=
-                f'You paid the owners of {arg1} {arg2} USD for their services!',
-                color=0xAA28FF)
-						await ctx.reply(embed=embed)
+						if cashboi<0:
+							cashboi+= intarg2
+							db[f'{ctx.author}_money'] = cashboi
+							embed = discord.Embed(
+                title='**INSUFFIECENT**',
+                description=f"You don't have enough money to do that!",
+                color=0xAA28FF
+							)
+							await ctx.reply(embed=embed)
+						if cashboi>=0:
+							db[f'{ctx.author}_money'] = cashboi
+								
+							embed = discord.Embed(
+	                title='**PAID**',
+	                description=
+	                f'You paid the owners of {arg1} {arg2} USD for their services!',
+	                color=0xAA28FF)
+							await ctx.reply(embed=embed)
 
 
 
@@ -147,10 +158,13 @@ async def addshop(ctx, arg1, arg2):
 			db[f'{arg1}'] = []
 		shoppe = db[f'{arg1}']
 		shoppe.append(f'{arg2}')
-		if 'shops' not in keys:
+		if 'shop' not in keys:
 			db['shop'] = []
-		sop = db[f'shops']
-		sop.append(f'{arg1}')
+		sop = db[f'shop']
+		print(sop)
+		print(shoppe)
+		if arg1 not in sop:
+			sop.append(f'{arg1}')
 		embed = discord.Embed(title='**SHOP CREATED**',
                           description=f'You are the *owner* of **{arg1}**!',
                           color=0xAA28FF)
@@ -204,8 +218,43 @@ async def invest(ctx):
         color=0xAA28FF)
 		await ctx.reply(embed=embed)
 
+@bot.command()
+async def investin(ctx, arg1, arg2):
+		if f'{ctx.author}_stonks' not in keys:
+			db[f'{ctx.author}_stonks'] = {}
+		player_cash = db[f'{ctx.author}_money']
+		stock_list = db[f'{ctx.author}_stonks']
+		stock = finnhub_client.quote(f'{arg1.upper()}')
+		stock_price = int(stock['o'])
+		shares_count = int(arg2)
+		price = shares_count*stock_price
+		player_cash -= price
+		if player_cash<0:
+			player_cash+=price
+			db[f'{ctx.author}_money'] = player_cash
+			await ctx.send("You don't have enough money!")
+		if player_cash>=0:
+			db[f'{ctx.author}_money'] = player_cash
+			while shares_count>0:
+				stock_list[f'{arg1.upper()}'] = stock_price
+				shares_count -= 1
+			print(stock)
+			print(stock_price)
+			print(stock_list)
+			print(player_cash)
+			print(shares_count)
+			print(price)
+			await ctx.send("Stocks purchased!")
 
-#allows the user to deposit cash in the bank.
+
+@bot.command()
+async def investments(ctx):
+	stock_list = db[f'{ctx.author}_stonks']
+	await ctx.send(f'You currently own {stock_list}.')
+
+
+
+
 @bot.command()
 async def deposit(ctx, arg1):
 	bank = db[f'{ctx.author}_bank']
@@ -270,6 +319,5 @@ async def withdraw(ctx, arg1):
 			description=f"You withdrew {arg1} USD.",
 			color=0xAA28FF
 		)
-		await ctx.reply(embed=embed)
-    
+		await ctx.reply(embed=embed) 
 bot.run(TOKEN)
