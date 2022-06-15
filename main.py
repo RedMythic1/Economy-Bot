@@ -193,14 +193,14 @@ async def jobs(ctx):
 @bot.command()
 async def invest(ctx):
 		aapl = finnhub_client.quote('AAPL')
-		msft = yf.Ticker("MSFT")
-		nvda = yf.Ticker("NVDA")
-		intc = yf.Ticker("INTC")
-		tsla = yf.Ticker("TSLA")
+		msft = finnhub_client.quote('MSFT')
+		nvda = finnhub_client.quote('NVDA')
+		intc = finnhub_client.quote("INTC")
+		tsla = finnhub_client.quote("TSLA")
 		embed = discord.Embed(
         title="**INVESTMENT LIST**",
         description=
-        f"Here is the list of all possible investments.\n **AAPL (Apple) - {aapl.info['regularMarketPrice']} USD (.investin aapl)**\n **MSFT(Microsoft) - {msft.info['regularMarketPrice']} USD (.investin msft)**\n **NVDA(Nvidia Corporation)-{nvda.info['regularMarketPrice']} USD (.investin nvda)**\n **INTC(Intel corporation) - {intc.info['regularMarketPrice']} USD (.investin intc)**\n **TSLA(Tesla motors) - {tsla.info['regularMarketPrice']} USD  (.investin tsla)**\n",
+        f"Here is the list of all possible investments.\n **AAPL (Apple) - {aapl['o']} USD (.investin aapl)**\n **MSFT(Microsoft) - {msft['o']} USD (.investin msft)**\n **NVDA(Nvidia Corporation)-{nvda['o']} USD (.investin nvda)**\n **INTC(Intel corporation) - {intc['o']} USD (.investin intc)**\n **TSLA(Tesla motors) - {tsla['o']} USD  (.investin tsla)**\n",
         color=0xAA28FF)
 		await ctx.reply(embed=embed)
 
