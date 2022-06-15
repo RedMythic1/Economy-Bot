@@ -19,8 +19,7 @@ async def invest(ctx):
 		msft = yf.Ticker("MSFT")
 		nvda = yf.Ticker("NVDA")
 		intl = yf.Ticker("INTL")
-    tsla = yf.Ticker("TSLA")
-    rivn = yf.Ticker("RIVN")
+		tsla = yf.Ticker("TSLA")
 		embed = discord.Embed(
         title="**INVESTMENT LIST**",
         description=
