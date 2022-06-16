@@ -5,3 +5,7 @@
 .deposit\
 .withdraw\
 .pay\
+.daily\
+.wallet(deposit)\
+.bank(deposit)\
+

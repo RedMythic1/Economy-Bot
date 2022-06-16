@@ -4,6 +4,21 @@ import os
 from replit import db
 import finnhub
 import time
+import requests
+from ratelimit import limits, RateLimitException
+from backoff import on_exception, expo
+
+TEN = 600
+
+@on_exception(expo, RateLimitException, max_tries=8)
+@limits(calls=10000, period=TEN)
+def call_api(url):
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        raise Exception('API response: {}'.format(response.status_code))
+    return response
+
 APIKEY = os.environ['API_KEY']
 finnhub_client = finnhub.Client(api_key=APIKEY)
 
@@ -125,7 +140,8 @@ async def payshop(ctx, arg1, arg2):
 				shoop = db[f'{arg1}']
 				shooplen = len(shoop)
 				intarg2 = int(arg2)
-				paydue = intarg2 / shooplen
+				payxyz = intarg2 / shooplen
+				paydue = int(payxyz)
 				print(paydue)
 				print(intarg2)
 				print(shooplen)
@@ -234,42 +250,64 @@ async def invest(ctx):
 
 @bot.command()
 async def investin(ctx, arg1, arg2):
-		if f'@{ctx.author.id}_stonks' not in keys:
-			db[f'@{ctx.author.id}_stonks'] = {}
-		if f'{arg1}_{ctx.author.id}' not in keys:
-			db[f'{arg1}_{ctx.author.id}'] = 0
+		keys = db.keys()
+		if f'{ctx.author.id}_stock_price' not in keys:
+			db[f'{ctx.author.id}_stock_price'] = {}
+		if f'{ctx.author.id}_stock_shares' not in keys:
+			db[f'{ctx.author.id}_stock_shares'] = {}
 		player_cash = db[f'@{ctx.author.id}_money']
-		stock_list = db[f'@{ctx.author.id}_stonks']
-		stock = finnhub_client.quote(f'{arg1.upper()}')
-		stock_price = int(stock['o'])
-		shares_count = int(arg2)
-		price = shares_count*stock_price
-		player_cash -= price
-		if player_cash<0 or player_cash<stock_price:
-			player_cash+=price
+		shares = int(arg2)
+		stock_trans = finnhub_client.quote(f'{arg1.upper()}')
+		stock_price = stock_trans['o']
+		price_to_pay = shares * stock_price
+		player_cash -= price_to_pay
+		if player_cash < 0:
+			embed = discord.Embed(
+			title='**INSUFFICIENT FUNDS**',
+			description=f"You don't have enough money to do that!",
+			color=0xAA28FF
+		)
+			await ctx.reply(embed = embed)
+		if player_cash >= 0:
 			db[f'@{ctx.author.id}_money'] = player_cash
-			embed = discord.Embed(title="**INSUFFICIENT FUNDS**", description = f"You don't have enough money to do this! :no_entry_sign: :dollar:", color = 0xAA28FF)
-			await ctx.reply(embed=embed)
-		elif player_cash>=0:
-			db[f'@{ctx.author.id}_money'] = player_cash
-			stock_list[arg1.upper()] = stock_price
-			current_owned_stocks = db[f'{arg1}_{ctx.author.id}'] 
-			current_owned_stocks+=shares_count
-			db[f'{arg1}_{ctx.author.id}'] = current_owned_stocks
-			embed = discord.Embed(title="**STOCKS PURCHASED!**", description= f"The stocks you requested were successfully purchased.", color=0xAA28FF)
-			await ctx.reply(embed=embed)
-
+			stock_price_dict = db[f'{ctx.author.id}_stock_price']
+			stock_shares_dict = db[f'{ctx.author.id}_stock_shares']
+			stock_price_dict[f'{arg1}'] = stock_price
+			if f'{arg1}_shares' not in stock_shares_dict.keys():
+				stock_shares_dict[f'{arg1}_shares'] = shares
+			elif f'{arg1}_shares' in stock_shares_dict.keys():
+				current_shares = stock_shares_dict[f'{arg1}_shares']
+				new_shares = current_shares + shares
+				stock_shares_dict[f'{arg1}_shares'] = new_shares
+			embed = discord.Embed(
+				title='**STOCKS PURCHASED**',
+				description=f'You purchased {arg2} share(s) of {arg1.upper()} stock at a rate of {stock_price} per share!',
+				color=0xAA28FF
+			)
+			await ctx.reply(embed = embed)
 
 @bot.command()
-async def investments(ctx):
-	stock_list = db[f'@{ctx.author.id}_stonks']
-	dict_len = len(stock_list.keys())
-	while dict_len>0:
-		current_stock = stock_list[dict_len-1]
-		current_stock_shares = db[f'{current_stock}_{ctx.author.id}']
-		await ctx.reply(f'You currently own {current_stock_shares} shares of {current_stock}.')
-		dict_len-=1
-
+async def investments(ctx, arg1):
+	stock_shares_dict = db[f'{ctx.author.id}_stock_shares']
+	if arg1 in stock_shares_dict.keys():
+		stock_shares_dict = db[f'{ctx.author.id}_stock_shares']
+		stock_price_dict = db[f'{ctx.author.id}_stock_price']
+		stock_shares = stock_shares_dict[f'{arg1}']
+		stock_price = stock_price_dict[f'{arg1}']
+		embed = discord.Embed(
+			title="INVESTMENTS",
+			description=f"You own {stock_shares} of {arg1.upper()}, which you bought at {stock_price}!",
+			color=0xAA28FF
+		)
+		await ctx.reply(embed = embed)
+	else:
+		embed = discord.Embed(
+			title="ERROR",
+			description=f"You don't own that stock!",
+			color=0xAA28FF
+		)
+		await ctx.reply(embed = embed)
+		
 
 
 
