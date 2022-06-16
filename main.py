@@ -3,7 +3,7 @@ from discord.ext import commands
 import os
 from replit import db
 import finnhub
-import asyncio
+import time
 APIKEY = os.environ['API_KEY']
 finnhub_client = finnhub.Client(api_key=APIKEY)
 
@@ -25,7 +25,7 @@ async def start(ctx):
 		embed = discord.Embed(
         title='**WELCOME**',
         description=
-        'Welcome to Stonkbroker, the Discord game bot based off of the real life **stock market**. Experience ups :chart_with_upwards_trend:, downs :chart_with_downwards_trend:, financial problems :sob:, and economic success :money_mouth: :moneybag:!',
+        'Welcome to Stonkbroker, the Discord game bot based off of the real life **stock market**. Experience ups :chart_with_upwards_trend:, downs :chart_with_downwards_trend:, financial issues :sob:, and economic success :money_mouth: :moneybag:!',
 				color=0xAA28FF
 )
 		await ctx.reply(embed=embed)
@@ -49,41 +49,51 @@ async def commands(ctx):
 #allows the user to claim their daily cash amount
 @bot.command()
 async def daily(ctx):
-		money = db[f'@{ctx.author.id}_money']
-		money += 100
-		db[f'@{ctx.author.id}_money'] = money
-		db[f'@{ctx.author.id}_daily'] = 'claimed'
-		embed = discord.Embed(title="**DAILY CLAIMED**", description = "You have successfully claimed today's daily. :city_sunset:", color =0xAA28FF)
-		await ctx.reply(embed=embed)
+		keys = db.keys()
+		if f'{ctx.author.id}_daily_cooldown' not in keys:
+					db[f'{ctx.author.id}_daily_cooldown'] = 0
+		player_time_daily = db[f'{ctx.author.id}_daily_cooldown']
+		if time.time() - player_time_daily > 86400:
+			money = db[f'@{ctx.author.id}_money']
+			money += 100
+			db[f'@{ctx.author.id}_money'] = money
+			db[f'@{ctx.author.id}_daily'] = 'claimed'
+			db[f'{ctx.author.id}_daily_cooldown'] = time.time()
+			embed = discord.Embed(title="**DAILY CLAIMED**", description = "You have successfully claimed today's daily. :city_sunset:", color =0xAA28FF)
+			await ctx.reply(embed=embed)
+		else:
+			embed = discord.Embed(title="**DAILY ALREADY CLAIMED**", description = "You have already claimed today's daily, come back tomorrow for your daily :city_sunset:", color =0xAA28FF)
+			await ctx.reply(embed=embed)
 #allows the user to send another user a certain amount of cash.
 @bot.command()
 async def pay(ctx, member: discord.Member, arg2):
-		cash_app = int(arg2)
-		if cash_app>0:
-			cash_sent = db[f'@{member.id}_money']
-			print(member.id)
-			new_cash = cash_sent + cash_app
-			print(cash_sent)
-			print(cash_app)
-			db[f'{member.id}_money'] = new_cash
-			money_deductable = db[f'@{ctx.author.id}_money']
-			new_money = money_deductable - cash_app
-			if money_deductable < 0:
-					cash_sent -= cash_app
-					db[f'@{member.id}_money'] = cash_sent
-					db[f'@{ctx.author.id}_money'] = (money_deductable + cash_app)
+			cash_to_send = int(arg2)
+			if cash_to_send>0:
+				cash_reciever_current_cash = db[f'@{member.id}_money']
+				print(member.id)
+				new_cash = cash_reciever_current_cash + cash_to_send
+				print(cash_reciever_current_cash)
+				print(cash_to_send)
+				db[f'{member.id}_money'] = new_cash
+				money_deductable = db[f'@{ctx.author.id}_money']
+				new_money = money_deductable - cash_to_send
+				db[f'@{member.id}_money'] = new_cash
+			if new_money < 0:
+					cash_reciever_current_cash -= cash_to_send
+					db[f'@{member.id}_money'] = cash_reciever_current_cash
+					db[f'@{ctx.author.id}_money'] = (money_deductable + cash_to_send)
 					embed = discord.Embed(title="**INSUFFICIENT FUNDS**", description = "You don't have enough money to do this! :no_entry_sign: :dollar:", color=0xAA28FF)
 					await ctx.reply(embed=embed)
-			elif money_deductable >= 0:
+			elif new_money >= 0:
 				db[f'@{ctx.author.id}_money'] = new_money
 				embed = discord.Embed(
 					title="***MONEY SENT***",
-					description=f"**You, {ctx.author}, sent {cash_app} USD to {member.mention}!**",
+					description=f'**You, {ctx.author}, sent {cash_to_send} USD to {member.mention}!**',
 					color=0xAA28FF)
 				await ctx.reply(embed=embed)
-		if cash_app<=0:
-			embed = discord.Embed(title="**INSUFFICIENT FUNDS**", description="You cannot give negative money or 0 money! :no_entry_sign: :dollar:", color=0xAA28FF)
-			await ctx.reply(embed=embed)
+			if cash_to_send<=0:
+				embed = discord.Embed(title="**INSUFFICIENT FUNDS**", description="You cannot give negative money or 0 money! :no_entry_sign: :dollar:", color=0xAA28FF)
+				await ctx.reply(embed=embed)
 
 
 
@@ -91,7 +101,6 @@ async def pay(ctx, member: discord.Member, arg2):
 #display's the user's balance.
 @bot.command()
 async def wallet(ctx):
-    global contents
     big_boi_cash = db[f'@{ctx.author.id}_money']
     embed = discord.Embed(title="**WALLET**",
                           description=f'You have **${big_boi_cash} USD** :dollar: in your wallet!',
@@ -239,7 +248,7 @@ async def investin(ctx, arg1, arg2):
 		if player_cash<0 or player_cash<stock_price:
 			player_cash+=price
 			db[f'@{ctx.author.id}_money'] = player_cash
-			embed = discord.Embed(title="**INSUFFICIENT FUNDS**", description = f"You don't have enough money to do this!", color = 0xAA28FF)
+			embed = discord.Embed(title="**INSUFFICIENT FUNDS**", description = f"You don't have enough money to do this! :no_entry_sign: :dollar:", color = 0xAA28FF)
 			await ctx.reply(embed=embed)
 		elif player_cash>=0:
 			db[f'@{ctx.author.id}_money'] = player_cash
@@ -268,29 +277,37 @@ async def investments(ctx):
 async def deposit(ctx, arg1):
 	bank = db[f'@{ctx.author.id}_bank']
 	intarg1 = int(arg1)
-	bank+=intarg1
-	db[f'@{ctx.author.id}_bank'] = bank
-	dudescash = db[f'@{ctx.author.id}_money']
-	dudescash -= intarg1
-	if dudescash<0:
-		bank = db[f'@{ctx.author.id}_bank']
-		bank -= intarg1
+	if intarg1>-1:
+		bank+=intarg1
 		db[f'@{ctx.author.id}_bank'] = bank
-		embed = discord.Embed(
-			title="**INSUFFICIENT FUNDS**",
-			description="You don't have enough to do that. :no_entry_sign: :dollar:",
-			color=0xAA28FF
-		)
-		await ctx.reply(embed = embed)
-	else:
-		db[f'@{ctx.author.id}_money'] = dudescash
-		embed = discord.Embed(
-			title="**MONEY IN BANK**",
-			description=f"You deposited **${arg1} USD.** :dollar:",
-			color=0xAA28FF
-		)
-		await ctx.reply(embed=embed)
-
+		dudescash = db[f'@{ctx.author.id}_money']
+		dudescash -= intarg1
+		if dudescash<0:
+			bank = db[f'@{ctx.author.id}_bank']
+			bank -= intarg1
+			db[f'@{ctx.author.id}_bank'] = bank
+			embed = discord.Embed(
+				title="**INSUFFICIENT FUNDS**",
+				description="You don't have enough to do that. :no_entry_sign: :dollar:",
+				color=0xAA28FF
+			)
+			await ctx.reply(embed = embed)
+		else:
+			db[f'@{ctx.author.id}_money'] = dudescash
+			embed = discord.Embed(
+				title="**MONEY IN BANK**",
+				description=f"You deposited **${arg1} USD.** :dollar:",
+				color=0xAA28FF
+			)
+			await ctx.reply(embed=embed)
+		
+	elif intarg1<=0:
+			embed = discord.Embed(
+				title="**INSUFFICIENT FUNDS**",
+				description=f"You cannot withdraw negative funds! :no_entry_sign: :dollar:",
+				color=0xAA28FF
+			)
+			await ctx.reply(embed = embed)
 #allows the user to 
 @bot.command()
 async def bank(ctx):
@@ -305,28 +322,84 @@ async def bank(ctx):
 #allows user to withdraw money from above bank
 @bot.command()
 async def withdraw(ctx, arg1):
+	global dudescash
 	bank = db[f'@{ctx.author.id}_bank']
 	intarg1 = int(arg1)
-	bank-=intarg1
-	db[f'@{ctx.author.id}_bank'] = bank
-	dudescash = db[f'@{ctx.author.id}_money']
-	if bank<0:
-		bank = db[f'{ctx.author.id}_bank']
-		bank += intarg1
+	if intarg1>=0:
+		bank-=intarg1
 		db[f'@{ctx.author.id}_bank'] = bank
-		embed = discord.Embed(
-			title="**INSUFFICIENT FUNDS**",
-			description="You don't have enough to do that. :no_entry_sign: :dollar:",
-			color=0xAA28FF
-		)
-		await ctx.reply(embed = embed)
+		dudescash = db[f'@{ctx.author.id}_money']
+		if bank<0:
+			bank = db[f'@{ctx.author.id}_bank']
+			bank += intarg1
+			db[f'@{ctx.author.id}_bank'] = bank
+			embed = discord.Embed(
+				title="**INSUFFICIENT FUNDS**",
+				description="You don't have enough to do that. :no_entry_sign: :dollar:",
+				color=0xAA28FF
+			)
+			await ctx.reply(embed = embed)
+		else:
+			dudescash += intarg1
+			db[f'@{ctx.author.id}_money'] = dudescash
+			embed = discord.Embed(
+				title="**MONEY IN WALLET**",
+				description=f"You withdrew **${arg1} USD.** :dollar:",
+				color=0xAA28FF
+			)
+			await ctx.reply(embed=embed) 
 	else:
-		dudescash += intarg1
-		db[f'@{ctx.author.id}_money'] = dudescash
 		embed = discord.Embed(
-			title="**MONEY IN WALLET**",
-			description=f"You withdrew **${arg1} USD.** :dollar:",
-			color=0xAA28FF
-		)
-		await ctx.reply(embed=embed) 
+				title="**INSUFFICIENT FUNDS**",
+				description=f"You cannot withdraw negative funds! :no_entry_sign: :dollar:",
+				color=0xAA28FF
+			)
+		await ctx.reply(embed=embed)
+@bot.command()
+async def interviewas(ctx, arg1):
+	keys = db.keys()
+	if arg1 == 'artist':
+		if f'@{ctx.author.id}_job' not in keys:
+			db[f'@{ctx.author.id}_job'] = 'None'
+		db[f'@{ctx.author.id}_job'] = 'Artist'
+		embed = discord.Embed(
+        title='**ARTIST JOB ACQUIRED**',
+        description=
+        'Congratulations, your have got the job, "The Artist". Run the .paint command every hour, and if the people like you painting, you will earn 850 USD!',
+				color=0xAA28FF
+)
+		await ctx.reply(embed=embed)
+@bot.command()
+async def paint(ctx):
+			keys = db.keys()
+			if f'{ctx.author.id}_jobs_cooldown' not in keys:
+						db[f'{ctx.author.id}_jobs_cooldown'] = 0
+			player_time_daily = db[f'{ctx.author.id}_jobs_cooldown']
+			if time.time() - player_time_daily > 84600:
+				money = db[f'@{ctx.author.id}_money']
+				db[f'@{ctx.author.id}_paint'] = 'claimed'
+				db[f'{ctx.author.id}_jobs_cooldown'] = time.time()
+				embed = discord.Embed(title="**PAINTING COMPLETE**", description = "You have appeased the audience! :city_sunset:", color =0xAA28FF)
+				await ctx.reply(embed=embed)
+				if db[f'@{ctx.author.id}_job'] == 'Artist':
+					money+=100
+				if db[f'@{ctx.author.id}_job'] == 'Baker':
+					money+=150
+				if db[f'@{ctx.author.id}_job'] == 'Banker':
+					money+=300
+				if db[f'@{ctx.author.id}_job'] == 'Boba':
+					money+=50
+				if db[f'@{ctx.author.id}_job'] == 'Book':
+					money+=60
+				if db[f'@{ctx.author.id}_job'] == 'Gamer':
+					money+=500
+				if db[f'@{ctx.author.id}_job'] == 'Math':
+					money+=400
+				if db[f'@{ctx.author.id}_job'] == 'None':
+					embed = discord.Embed(title="**WRONG JOB**", description = "You must be an artist to do this. Please run .interviewas artist to get this job.", color =0xAA28FF)
+					await ctx.reply(embed=embed)
+				db[f'@{ctx.author.id}_money'] = money
+			else:
+				embed = discord.Embed(title="**JOB ALREADY DONE**", description = "You have already done your job, come back in a day to work more! :city_sunset:", color =0xAA28FF)
+				await ctx.reply(embed=embed)
 bot.run(TOKEN)
